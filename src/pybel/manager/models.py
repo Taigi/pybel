@@ -153,7 +153,7 @@ class Namespace(Base):
     citation_published = Column(Date, nullable=True)
     citation_url = Column(String(255), nullable=True)
 
-    # entries = relationship('NamespaceEntry', backref='namespace', cascade='all, delete-orphan')
+    # entries = relationship('NamespaceEntry', lazy='dynamic')
 
     has_equivalences = Column(Boolean, default=False)
 
@@ -197,7 +197,7 @@ class NamespaceEntry(Base):
     encoding = Column(String(8), nullable=True, doc='The biological entity types for which this name is valid')
 
     namespace_id = Column(Integer, ForeignKey(NAMESPACE_TABLE_NAME + '.id'), index=True)
-    namespace = relationship('Namespace', backref=backref('entries'))
+    namespace = relationship('Namespace', backref=backref('entries', lazy='dynamic'))
 
     equivalence_id = Column(Integer, ForeignKey('{}.id'.format(NAMESPACE_EQUIVALENCE_CLASS_TABLE_NAME)), nullable=True)
     equivalence = relationship('NamespaceEntryEquivalence', backref=backref('members'))
@@ -295,7 +295,7 @@ class AnnotationEntry(Base):
     label = Column(String(255), nullable=True)
 
     annotation_id = Column(Integer, ForeignKey(ANNOTATION_TABLE_NAME + '.id'), index=True)
-    annotation = relationship('Annotation', backref=backref('entries'))
+    annotation = relationship('Annotation', backref=backref('entries', lazy='dynamic'))
 
     children = relationship(
         'AnnotationEntry',

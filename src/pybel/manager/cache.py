@@ -135,6 +135,7 @@ class NamespaceManager(BaseCacheManager):
         the values of this namespace.
 
         :param str url: the location of the namespace file
+        :param bool get_object: flags if insert_namespace should return a namespace object
         :return: SQL Alchemy model instance, populated with data from URL
         :rtype: Namespace or dict
         """
@@ -166,10 +167,61 @@ class NamespaceManager(BaseCacheManager):
                 namespace_insert_values[database_column] = bel_resource[section][key]
 
         namespace = Namespace(**namespace_insert_values)
-        namespace.entries = [NamespaceEntry(name=c, encoding=e) for c, e in values.items()]
+        # namespace.entries = [NamespaceEntry(name=c, encoding=e) for c, e in values.items()]
+
+        namespace.entries = []
+
+        for c, e in values.items():
+            namespace.entries.append(NamespaceEntry(name=c, encoding=e))
+            self.namespace_cache[url][c] = e
 
         self.session.add(namespace)
         self.session.commit()
+        self.session.close()
+
+        ns_id = namespace.id
+
+        del values
+        del bel_resource
+        del namespace
+
+        return ns_id  # namespace
+
+    def ensure_namespace_II(self, url):
+        """Caches a namespace file if not already in the cache database. If the namespace is not cachable the method
+        returns a dict of values.
+
+        :param str url: the location of the namespace file
+        :return: An instance of Namespace object
+        """
+
+        if url in self.namespace_model:
+            log.debug('already in cache database: %s', url)
+            namespace_ = self.namespace_model[url]
+            if isinstance(namespace_, dict):
+                namespace = namespace_
+            else:
+                namespace = self.session.query(Namespace).filter_by(id=namespace_).first()
+
+        else:
+            t = time.time()
+            namespace = self.session.query(Namespace).filter(Namespace.url == url).one_or_none()
+
+            if namespace is None:
+                namespace = self.session.query(Namespace).filter_by(id=self.insert_namespace(url)).first()
+
+
+            else:
+                log.debug('loaded namespace: %s (%d, %.2fs)', url, len(namespace.entries), time.time() - t)
+
+            if namespace is None:
+                raise ValueError('No results for {}'.format(url))
+            elif isinstance(namespace, dict):
+                return namespace
+            elif not namespace.entries:
+                raise ValueError('No entries for {}'.format(url))
+
+            self.namespace_model[url] = namespace.id
 
         return namespace
 

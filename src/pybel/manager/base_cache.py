@@ -49,7 +49,7 @@ class BaseCacheManager(object):
         self.engine = create_engine(self.connection, echo=echo)
 
         #: A SQLAlchemy session maker
-        self.sessionmaker = sessionmaker(bind=self.engine, autoflush=False, expire_on_commit=False)
+        self.sessionmaker = sessionmaker(bind=self.engine, autoflush=False, expire_on_commit=True)
 
         #: A SQLAlchemy session object
         self.session = scoped_session(self.sessionmaker)
