@@ -169,15 +169,15 @@ class NamespaceManager(BaseCacheManager):
         namespace = Namespace(**namespace_insert_values)
         # namespace.entries = [NamespaceEntry(name=c, encoding=e) for c, e in values.items()]
 
-        namespace.entries = []
+        self.session.add(namespace)
 
         for c, e in values.items():
-            namespace.entries.append(NamespaceEntry(name=c, encoding=e))
+            nse = NamespaceEntry(name=c, encoding=e, namespace=namespace)
             self.namespace_cache[url][c] = e
 
-        self.session.add(namespace)
+            self.session.add(nse)
+
         self.session.commit()
-        self.session.close()
 
         ns_id = namespace.id
 
