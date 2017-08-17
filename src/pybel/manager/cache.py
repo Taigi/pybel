@@ -46,6 +46,8 @@ try:
 except ImportError:
     import pickle
 
+from memory_profiler import profile
+
 __all__ = [
     'CacheManager',
     'build_manager',
@@ -130,6 +132,7 @@ class NamespaceManager(BaseCacheManager):
         self.session.query(Namespace).filter(Namespace.url == url).delete()
         self.session.commit()
 
+    @profile
     def insert_namespace(self, url):
         """Inserts the namespace file at the given location to the cache. If not cachable, returns the dict of
         the values of this namespace.
@@ -167,25 +170,15 @@ class NamespaceManager(BaseCacheManager):
                 namespace_insert_values[database_column] = bel_resource[section][key]
 
         namespace = Namespace(**namespace_insert_values)
-        # namespace.entries = [NamespaceEntry(name=c, encoding=e) for c, e in values.items()]
+        namespace.entries = [NamespaceEntry(name=c, encoding=e) for c, e in values.items()]
 
         self.session.add(namespace)
-
-        for c, e in values.items():
-            nse = NamespaceEntry(name=c, encoding=e, namespace=namespace)
-            self.namespace_cache[url][c] = e
-
-            self.session.add(nse)
-
         self.session.commit()
-
-        ns_id = namespace.id
 
         del values
         del bel_resource
-        del namespace
 
-        return ns_id  # namespace
+        return namespace
 
     def ensure_namespace_II(self, url):
         """Caches a namespace file if not already in the cache database. If the namespace is not cachable the method
@@ -208,8 +201,11 @@ class NamespaceManager(BaseCacheManager):
             namespace = self.session.query(Namespace).filter(Namespace.url == url).one_or_none()
 
             if namespace is None:
-                namespace = self.session.query(Namespace).filter_by(id=self.insert_namespace(url)).first()
-
+                namespace_ = self.insert_namespace(url)
+                if isinstance(namespace_, dict):
+                    namespace = namespace_
+                else:
+                    namespace = self.session.query(Namespace).filter_by(id=namespace_).first()
 
             else:
                 log.debug('loaded namespace: %s (%d, %.2fs)', url, len(namespace.entries), time.time() - t)
@@ -221,7 +217,10 @@ class NamespaceManager(BaseCacheManager):
             elif not namespace.entries:
                 raise ValueError('No entries for {}'.format(url))
 
-            self.namespace_model[url] = namespace.id
+            if isinstance(namespace, dict):
+                self.namespace_model[url] = namespace
+            else:
+                self.namespace_model[url] = namespace.id
 
         return namespace
 
