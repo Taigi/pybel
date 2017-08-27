@@ -182,6 +182,7 @@ class NamespaceManager(BaseCacheManager):
 
         return namespace
 
+    @profile
     def ensure_namespace(self, url, cache_objects=False):
         """Caches a namespace file if not already in the cache. If not cachable, returns a dict of the values
 
@@ -216,12 +217,14 @@ class NamespaceManager(BaseCacheManager):
                 self.namespace_cache[url][entry.name] = list(entry.encoding)  # set()
                 self.namespace_id_cache[url][entry.name] = entry.id
 
+            del results
+
         if cache_objects and url not in self.namespace_object_cache:
             log.debug('loading namespace cache_objects: %s (%d)', url, len(self.namespace_cache[url]))
             for entry in results.entries:
                 self.namespace_object_cache[url][entry.name] = entry
 
-        return results
+        #return results
 
     def get_namespace(self, url):
         """Returns a dict of names and their encodings for the given namespace URL.
@@ -229,13 +232,15 @@ class NamespaceManager(BaseCacheManager):
         :param url: the location of the namespace file
         :type url: str
         """
-        result = self.ensure_namespace(url)
+        #result = self.ensure_namespace(url)
+        self.ensure_namespace(url)
 
-        if isinstance(result, dict):
-            return result
-        else:
-            # self.ensure_namespace makes sure it's in the cache if its not cachable
-            return self.namespace_cache[url]
+        # if isinstance(result, dict):
+        #     return result
+        # else:
+
+        # self.ensure_namespace makes sure it's in the cache if its not cachable
+        return self.namespace_cache[url]
 
     def get_namespace_entry(self, url, value):
         """Gets a given NamespaceEntry object.
@@ -255,7 +260,7 @@ class NamespaceManager(BaseCacheManager):
         else:
             # URL not in cache or value not in cache[url]
             namespace_entry = self.session.query(Namespace).join(NamespaceEntry).filter(Namespace.url == url). \
-                filter(NamespaceEntry.name == value).first()
+                filter(NamespaceEntry.name == value).one_or_none()
 
             self.namespace_object_cache[url][value] = namespace_entry
 
@@ -408,6 +413,9 @@ class AnnotationManager(BaseCacheManager):
         self.session.add(annotation)
         self.session.commit()
 
+        del config
+        del annotation_insert_values
+
         return annotation
 
     def ensure_annotation(self, url, objects=False):
@@ -437,12 +445,14 @@ class AnnotationManager(BaseCacheManager):
                 self.annotation_cache[url][entry.name] = entry.label
                 self.annotation_id_cache[url][entry.name] = entry.id
 
+            del results
+
         if objects and url not in self.annotation_object_cache:
             log.debug('loading annotation objects: %s (%d)', url, len(self.annotation_cache[url]))
             for entry in results.entries:
                 self.annotation_object_cache[url][entry.name] = entry
 
-        return results
+        #return results
 
     def get_annotation(self, url):
         """Returns a dict of annotations and their labels for the given annotation file
@@ -460,11 +470,23 @@ class AnnotationManager(BaseCacheManager):
         :return: An AnnotationEntry object
         :rtype: AnnotationEntry
         """
-        if self.annotation_object_cache:
+
+        if url in self.annotation_object_cache and value in self.annotation_object_cache[url]:
+            # URL is present in cache and value is present in cache[url]
             annotation_entry = self.annotation_object_cache[url][value]
+
         else:
-            annotation = self.session.query(Annotation).filter_by(url=url).one()
-            annotation_entry = self.session.query(AnnotationEntry).filter_by(annotation=annotation, name=value).one()
+            # URL not in cache or value not in cache[url]
+            annotation_entry = self.session.query(Annotation).join(AnnotationEntry).filter(Annotation.url == url). \
+                filter(AnnotationEntry.name == value).one_or_none()
+
+            self.annotation_object_cache[url][value] = annotation_entry
+
+        # if self.annotation_object_cache:
+        #     annotation_entry = self.annotation_object_cache[url][value]
+        # else:
+        #     annotation = self.session.query(Annotation).filter_by(url=url).one()
+        #     annotation_entry = self.session.query(AnnotationEntry).filter_by(annotation=annotation, name=value).one()
 
         return annotation_entry
 
